@@ -2,22 +2,28 @@
 import numpy as np
 import tifffile
 from scipy.ndimage import label, generate_binary_structure
+import csv
+import os
 
 #%%
-import napari
-viewer = napari.Viewer()
+pixel_class_path = r"D:\test_files\Nellie Topological properties\507\nellie_test\nellie_output\507-ome.ome-ch0-im_pixel_class.ome.tif"
+visualize = False
+save_name = os.path.basename(pixel_class_path).split("-")[0] + "_adjacency_list.csv"
+save_path = os.path.join(os.path.dirname(pixel_class_path), save_name)
 
 #%%
-pixel_class_path = r"D:\test_files\Nellie Topological properties\500\nellie_test\nellie_output\500-ome.ome-ch0-im_pixel_class.ome.tif"
+if visualize:
+    import napari
+    viewer = napari.Viewer()
 
 # Load your 3D TIF
 skeleton = tifffile.imread(pixel_class_path)  
-viewer.add_image(skeleton)
+viewer.add_image(skeleton) if visualize else None
 # %%
 struct = np.ones((3,3,3))
 # Get trees
 trees, num_trees = label(skeleton>0, structure=struct)
-viewer.add_labels(trees)
+viewer.add_labels(trees) if visualize else None
 
 # Convert tips and lone-tips to nodes, junctions are already nodes
 skeleton[skeleton == 2] = 4
@@ -26,12 +32,12 @@ skeleton[skeleton == 1] = 4
 # Remove all voxels == 4 (nodes)
 no_nodes = np.where(skeleton == 4, 0, skeleton)
 edges, num_edges = label(no_nodes>0, structure=struct)
-viewer.add_labels(edges)
+viewer.add_labels(edges) if visualize else None
 
 # nodes only
 nodes = np.where(skeleton == 4, 4, 0)
 node_labels, num_nodes = label(nodes>0, structure=struct)
-viewer.add_labels(node_labels)
+viewer.add_labels(node_labels) if visualize else None
 
 # %%
 # Build adjacency: which edges connect to which node?
@@ -98,39 +104,42 @@ for e_id, connected_nodes in edge_nodes.items():
             for j in range(i+1, len(cn)):
                 G.add_edge(cn[i], cn[j], edge_id=e_id)
                 
-adjacency_list = {node: list(G[node]) for node in G.nodes()}
-
-# Get adjacency matrix
-from networkx.convert_matrix import to_numpy_array
-A = to_numpy_array(G, nodelist=sorted(G.nodes()))
-
-# Detect cycles
-cycles = nx.cycle_basis(G)
-
-print("Adjacency list:")
-for node, neighbors in adjacency_list.items():
-    print(node, "->", neighbors)
 
 # %%
-import matplotlib.pyplot as plt
-# nx.draw(G)
+if visualize:
+    import matplotlib.pyplot as plt
+    # nx.draw(G)
 
-pos = nx.spring_layout(G, seed=7)  # positions for all nodes - seed for reproducibility
-nx.draw_networkx_nodes(G, pos, node_size=700, node_color="r")
-nx.draw_networkx_labels(G, pos, font_size=20, font_family="sans-serif")
-nx.draw_networkx_edges(G, pos, width=5, alpha=1, edge_color="b")
+    pos = nx.spring_layout(G)
+    nx.draw_networkx_nodes(G, pos, node_size=100, node_color="r")
+    nx.draw_networkx_labels(G, pos, font_family="sans-serif", font_size=8)
+    nx.draw_networkx_edges(G, pos, edge_color="b", width=3)
 
-ax = plt.gca()
-ax.margins(0.08)
-plt.axis("off")
-plt.tight_layout()
-plt.show()
+    ax = plt.gca()
+    ax.margins(0.08)
+    plt.axis("off")
+    plt.tight_layout()
+    plt.show()
 
 # %%
 # To look at individual trees:
 components = nx.connected_components(G)
-for comp in nx.connected_components(G):
-    subG = G.subgraph(comp).copy()
-    # Now subG is a smaller graph containing only that tree.
-    # You can do whatever analysis you want on it.
 
+# Open a new CSV file to write
+with open(save_path, "w", newline="") as f:
+    writer = csv.writer(f)
+    # Write the header row
+    writer.writerow(["component_num", "node", "adjacencies"])
+    
+    # Enumerate all components, starting at 1
+    for comp_num, comp in enumerate(components, start=1):
+        # Create a subgraph for the current component
+        subG = G.subgraph(comp).copy()
+        
+        # For each node in the subgraph, write out its adjacencies
+        for node in sorted(subG.nodes()):
+            # Get the neighbors/adjacencies of this node
+            adjacency = sorted(list(subG[node]))
+            writer.writerow([comp_num, node, adjacency])
+
+print("Adjacency list CSV saved as 'adjacency_list.csv'.")
