@@ -113,4 +113,11 @@ for node, neighbors in adjacency_list.items():
 
 # %%
 nx.draw(G)
+
 # %%
+# To look at individual trees:
+components = nx.connected_components(G)
+for comp in nx.connected_components(G):
+    subG = G.subgraph(comp).copy()
+    # Now subG is a smaller graph containing only that tree.
+    # You can do whatever analysis you want on it.
