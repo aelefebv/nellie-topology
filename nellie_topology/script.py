@@ -112,7 +112,19 @@ for node, neighbors in adjacency_list.items():
     print(node, "->", neighbors)
 
 # %%
-nx.draw(G)
+import matplotlib.pyplot as plt
+# nx.draw(G)
+
+pos = nx.spring_layout(G, seed=7)  # positions for all nodes - seed for reproducibility
+nx.draw_networkx_nodes(G, pos, node_size=700, node_color="r")
+nx.draw_networkx_labels(G, pos, font_size=20, font_family="sans-serif")
+nx.draw_networkx_edges(G, pos, width=5, alpha=1, edge_color="b")
+
+ax = plt.gca()
+ax.margins(0.08)
+plt.axis("off")
+plt.tight_layout()
+plt.show()
 
 # %%
 # To look at individual trees:
@@ -121,3 +133,4 @@ for comp in nx.connected_components(G):
     subG = G.subgraph(comp).copy()
     # Now subG is a smaller graph containing only that tree.
     # You can do whatever analysis you want on it.
+
